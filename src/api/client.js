@@ -2,7 +2,7 @@ import axios from 'axios';
 import { tokenStorage } from '../lib/storage.js';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://sc-cbb-web.up.railway.app/api',
   timeout: 20_000,
 });
 
@@ -17,7 +17,7 @@ let refreshing = null;
 async function refreshAccessToken() {
   const refreshToken = tokenStorage.getRefresh();
   if (!refreshToken) throw new Error('NO_REFRESH_TOKEN');
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+  const baseURL = import.meta.env.VITE_API_URL || 'https://sc-cbb-web.up.railway.app/api';
   const response = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
   const payload = response.data?.data;
   tokenStorage.set(payload);

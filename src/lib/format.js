@@ -56,7 +56,7 @@ export function humanize(value = '') {
 export function assetUrl(path) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
-  const api = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+  const api = import.meta.env.VITE_API_URL || 'https://sc-cbb-web.up.railway.app/api';
   const origin = api.replace(/\/api\/?$/, '');
   return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
 }
