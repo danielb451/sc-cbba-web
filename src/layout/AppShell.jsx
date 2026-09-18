@@ -22,12 +22,6 @@ import { useQuery } from '@tanstack/react-query';
 import { catalogApi } from '../api/endpoints.js';
 const navItems = [
   {
-    to: '/rutas-asignadas',
-    label: 'Rutas asignadas',
-    icon: MapPinned,
-    permission: 'patrols.manage',
-  },
-  {
     to: '/',
     label: 'Inicio',
     icon: Home,
@@ -35,6 +29,12 @@ const navItems = [
     end: true,
   },
   { to: '/mapa', label: 'Mapa', icon: MapPinned, permission: 'map.read' },
+  {
+    to: '/rutas-asignadas',
+    label: 'Rutas asignadas',
+    icon: MapPinned,
+    permission: 'patrols.manage',
+  },
   {
     to: '/guardias',
     label: 'Guardias',
