@@ -1,20 +1,16 @@
 import { GeoJSON, Tooltip } from 'react-leaflet';
 
 const ZONE_COLORS = [
-  '#3b82f6', // azul
-  '#8b5cf6', // morado
-  '#14b8a6', // turquesa
-  '#f59e0b', // naranja
-  '#ec4899', // rosado
-  '#22c55e', // verde
-  '#06b6d4', // celeste
-  '#6366f1', // índigo
+  '#3b82f6',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f59e0b',
+  '#ec4899',
+  '#22c55e',
+  '#06b6d4',
+  '#6366f1',
 ];
 
-/**
- * Devuelve siempre el mismo color para una zona
- * utilizando su ID.
- */
 export function getZoneColor(zone) {
   if (!zone?.id) {
     return '#64748b';
@@ -29,15 +25,6 @@ export function getZoneColor(zone) {
   return ZONE_COLORS[Math.abs(hash) % ZONE_COLORS.length];
 }
 
-/**
- * Permite trabajar tanto con:
- *
- * geoJson: { ... }
- *
- * como con:
- *
- * geoJson: "{ ... }"
- */
 function normalizeGeoJson(geoJson) {
   if (!geoJson) {
     return null;
@@ -63,6 +50,7 @@ export default function JurisdictionLayer({
   zone,
   selected = false,
   onClick,
+  interactive = true,
 }) {
   const geoJson = normalizeGeoJson(zone?.geoJson);
 
@@ -81,12 +69,8 @@ export default function JurisdictionLayer({
     dashArray: selected ? undefined : '6 4',
   };
 
-  return (
-    <GeoJSON
-      key={`${zone.id}-${selected}`}
-      data={geoJson}
-      style={normalStyle}
-      eventHandlers={{
+  const eventHandlers = interactive
+    ? {
         click: () => {
           onClick?.(zone);
         },
@@ -101,20 +85,31 @@ export default function JurisdictionLayer({
         mouseout: (event) => {
           event.target.setStyle(normalStyle);
         },
-      }}
-    >
-      <Tooltip sticky>
-        <div>
-          <strong>{zone.name || 'Zona operativa'}</strong>
+      }
+    : {};
 
-          {zone.description ? (
-            <>
-              <br />
-              <span>{zone.description}</span>
-            </>
-          ) : null}
-        </div>
-      </Tooltip>
+  return (
+    <GeoJSON
+      key={`${zone.id}-${selected}-${interactive}`}
+      data={geoJson}
+      style={normalStyle}
+      interactive={interactive}
+      eventHandlers={eventHandlers}
+    >
+      {interactive ? (
+        <Tooltip sticky>
+          <div>
+            <strong>{zone.name || 'Zona operativa'}</strong>
+
+            {zone.description ? (
+              <>
+                <br />
+                <span>{zone.description}</span>
+              </>
+            ) : null}
+          </div>
+        </Tooltip>
+      ) : null}
     </GeoJSON>
   );
 }

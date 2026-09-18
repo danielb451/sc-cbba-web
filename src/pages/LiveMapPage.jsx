@@ -267,7 +267,7 @@ export default function LiveMapPage() {
                 <JurisdictionLayer
                   key={`zone-${zone.id}`}
                   zone={zone}
-                  selected={zone.id === (selected?.zoneId || selected?.zone?.id)}
+                  interactive={false}
                 />
               ))}
               {(incidents.data || []).map((incident) => (
