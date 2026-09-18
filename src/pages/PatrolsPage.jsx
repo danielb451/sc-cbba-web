@@ -1,28 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  TileLayer,
-} from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  MapPin,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MapPin, Pencil, Plus, ShieldCheck, Users } from 'lucide-react';
 
 import {
   catalogApi,
   guardApi,
   patrolApi,
+  locationApi,
 } from '../api/endpoints.js';
 
 import { apiError } from '../api/client.js';
@@ -41,15 +27,13 @@ import JurisdictionLayer, {
 
 import { FlyTo } from '../components/maps/MapHelpers.jsx';
 
-import {
-  COCHABAMBA_CENTER,
-  geoJsonCenter,
-} from '../lib/maps.js';
+import { COCHABAMBA_CENTER, geoJsonCenter } from '../lib/maps.js';
 
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-
+import ComplianceStatus from '../components/ComplianceStatus.jsx';
+import GuardMarker from '../components/maps/GuardMarker.jsx';
 const baseIcon = L.divIcon({
   className: 'base-marker-wrapper',
   html: '<span class="base-marker">⌂</span>',
@@ -57,15 +41,18 @@ const baseIcon = L.divIcon({
   iconAnchor: [21, 42],
 });
 
-
 export default function PatrolsPage() {
+  const current = useQuery({
+    queryKey: ['locations', 'current'],
+    queryFn: locationApi.current,
+    refetchInterval: 15000,
+  });
   const toast = useToast();
   const { can } = useAuth();
   const qc = useQueryClient();
 
   const [selectedId, setSelectedId] = useState(null);
   const [modal, setModal] = useState(null);
-
 
   /* ==========================================================
      CONSULTAS
@@ -89,7 +76,6 @@ export default function PatrolsPage() {
     queryFn: catalogApi.zones,
   });
 
-
   /* ==========================================================
      SELECCIÓN INICIAL
      ========================================================== */
@@ -100,15 +86,9 @@ export default function PatrolsPage() {
     }
   }, [patrols.data, selectedId]);
 
-
   const selected = useMemo(() => {
-    return (
-      patrols.data?.find(
-        (patrol) => patrol.id === selectedId
-      ) || null
-    );
+    return patrols.data?.find((patrol) => patrol.id === selectedId) || null;
   }, [patrols.data, selectedId]);
-
 
   /*
    * Algunos endpoints pueden devolver:
@@ -121,11 +101,7 @@ export default function PatrolsPage() {
    *
    * Esto soporta ambos.
    */
-  const selectedZoneId =
-    selected?.zoneId ||
-    selected?.zone?.id ||
-    null;
-
+  const selectedZoneId = selected?.zoneId || selected?.zone?.id || null;
 
   /* ==========================================================
      GUARDAR PATRULLA / BASE
@@ -148,9 +124,7 @@ export default function PatrolsPage() {
 
       setModal(null);
 
-      toast.success(
-        'Patrulla/base guardada y asignaciones sincronizadas'
-      );
+      toast.success('Patrulla/base guardada y asignaciones sincronizadas');
     },
 
     onError: (error) => {
@@ -158,21 +132,14 @@ export default function PatrolsPage() {
     },
   });
 
-
   /* ==========================================================
      CENTRO DEL MAPA
      ========================================================== */
 
   const center =
-    selected?.latitude != null &&
-    selected?.longitude != null
-      ? [
-          Number(selected.latitude),
-          Number(selected.longitude),
-        ]
-      : geoJsonCenter(selected?.zone?.geoJson) ||
-        COCHABAMBA_CENTER;
-
+    selected?.latitude != null && selected?.longitude != null
+      ? [Number(selected.latitude), Number(selected.longitude)]
+      : geoJsonCenter(selected?.zone?.geoJson) || COCHABAMBA_CENTER;
 
   /* ==========================================================
      ZONAS VISIBLES
@@ -180,12 +147,9 @@ export default function PatrolsPage() {
 
   const visibleZones = useMemo(() => {
     return (zones.data || []).filter(
-      (zone) =>
-        zone.active !== false &&
-        Boolean(zone.geoJson)
+      (zone) => zone.active !== false && Boolean(zone.geoJson),
     );
   }, [zones.data]);
-
 
   /* ==========================================================
      SELECCIONAR ZONA DESDE EL MAPA
@@ -194,8 +158,7 @@ export default function PatrolsPage() {
   function handleZoneClick(clickedZone) {
     const patrol = patrols.data?.find(
       (item) =>
-        item.zoneId === clickedZone.id ||
-        item.zone?.id === clickedZone.id
+        item.zoneId === clickedZone.id || item.zone?.id === clickedZone.id,
     );
 
     if (patrol) {
@@ -203,14 +166,12 @@ export default function PatrolsPage() {
     }
   }
 
-
   /* ==========================================================
      RENDER
      ========================================================== */
 
   return (
     <div>
-
       <SectionHeader
         title="Patrullas / Bases operativas"
         text="Cada patrulla funciona como una base de operación: ubicación, responsable, guardias asignados y jurisdicción geográfica."
@@ -231,81 +192,56 @@ export default function PatrolsPage() {
         }
       />
 
-
       <section className="patrol-layout">
-
         {/* =====================================================
             LISTA DE BASES
             ===================================================== */}
 
         <div className="patrol-list">
-
           {patrols.isLoading ? (
             <LoadingState />
           ) : patrols.data?.length ? (
-
             patrols.data.map((patrol) => (
               <article
                 key={patrol.id}
                 className={`patrol-card panel ${
-                  patrol.id === selectedId
-                    ? 'active'
-                    : ''
+                  patrol.id === selectedId ? 'active' : ''
                 }`}
-                onClick={() =>
-                  setSelectedId(patrol.id)
-                }
+                onClick={() => setSelectedId(patrol.id)}
                 onKeyDown={(event) => {
-                  if (
-                    event.key === 'Enter' ||
-                    event.key === ' '
-                  ) {
+                  if (event.key === 'Enter' || event.key === ' ') {
                     setSelectedId(patrol.id);
                   }
                 }}
                 role="button"
                 tabIndex={0}
               >
-
                 <div className="patrol-card__icon">
                   <ShieldCheck size={24} />
                 </div>
 
                 <div className="patrol-card__copy">
-
                   <div>
                     <b>{patrol.code}</b>
 
-                    <StatusBadge
-                      value={patrol.status}
-                    />
+                    <StatusBadge value={patrol.status} />
                   </div>
 
-                  <h3>
-                    {patrol.name || 'Base operativa'}
-                  </h3>
+                  <h3>{patrol.name || 'Base operativa'}</h3>
 
                   <span>
                     <MapPin size={15} />
 
-                    {patrol.zone?.name ||
-                      'Sin jurisdicción'}
+                    {patrol.zone?.name || 'Sin jurisdicción'}
                   </span>
 
                   <span>
                     <Users size={15} />
-
-                    {patrol.members?.length || 0}{' '}
-                    guardias
+                    {patrol.members?.length || 0} guardias
                   </span>
 
-                  <small>
-                    {patrol.address ||
-                      'Dirección no configurada'}
-                  </small>
-
+                  <small>{patrol.address || 'Dirección no configurada'}</small>
                 </div>
-
 
                 {can('patrols.manage') ? (
                   <button
@@ -323,72 +259,61 @@ export default function PatrolsPage() {
                     <Pencil size={17} />
                   </button>
                 ) : null}
-
               </article>
             ))
-
           ) : (
             <EmptyState title="Sin bases operativas" />
           )}
-
         </div>
-
 
         {/* =====================================================
             COLUMNA DERECHA
             ===================================================== */}
 
         <div className="patrol-map-column">
-
-
           {/* ===================================================
               MAPA
               =================================================== */}
 
           <section className="panel patrol-map-panel">
-
             <header>
               <div>
                 <h3>Mapa de jurisdicciones</h3>
 
                 <p>
-                  Las áreas coloreadas representan
-                  las zonas operativas asignadas
-                  a cada base.
+                  Las áreas coloreadas representan las zonas operativas
+                  asignadas a cada base.
                 </p>
               </div>
 
-              {selected ? (
-                <StatusBadge
-                  value={selected.status}
-                />
-              ) : null}
+              {selected ? <StatusBadge value={selected.status} /> : null}
             </header>
 
-
             <div className="patrol-map-wrap">
-
-              <MapContainer
-                center={center}
-                zoom={13}
-                className="leaflet-map"
-              >
-
+              <MapContainer center={center} zoom={13} className="leaflet-map">
+                {(current.data || [])
+                  .filter(
+                    (item) =>
+                      item.patrol?.id === selectedId ||
+                      selected?.members?.some(
+                        (m) => m.guardId === item.guard.id,
+                      ),
+                  )
+                  .map((item) => (
+                    <GuardMarker key={item.serviceId} item={item} />
+                  ))}
                 {/* MAPA BASE */}
 
                 <TileLayer
                   url={
-                    import.meta.env
-                      .VITE_MAP_TILE_URL ||
+                    import.meta.env.VITE_MAP_TILE_URL ||
                     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
                   }
                   attribution={
-                    import.meta.env
-                      .VITE_MAP_ATTRIBUTION ||
+                    import.meta.env.VITE_MAP_ATTRIBUTION ||
                     '&copy; OpenStreetMap contributors'
                   }
                 />
-
 
                 {/* =============================================
                     JURISDICCIONES
@@ -398,13 +323,10 @@ export default function PatrolsPage() {
                   <JurisdictionLayer
                     key={zone.id}
                     zone={zone}
-                    selected={
-                      zone.id === selectedZoneId
-                    }
+                    selected={zone.id === selectedZoneId}
                     onClick={handleZoneClick}
                   />
                 ))}
-
 
                 {/* =============================================
                     MARCADORES DE BASES
@@ -413,8 +335,7 @@ export default function PatrolsPage() {
                 {(patrols.data || [])
                   .filter(
                     (patrol) =>
-                      patrol.latitude != null &&
-                      patrol.longitude != null
+                      patrol.latitude != null && patrol.longitude != null,
                   )
                   .map((patrol) => (
                     <Marker
@@ -425,39 +346,27 @@ export default function PatrolsPage() {
                       ]}
                       icon={baseIcon}
                       eventHandlers={{
-                        click: () =>
-                          setSelectedId(patrol.id),
+                        click: () => setSelectedId(patrol.id),
                       }}
                     >
                       <Popup>
                         <b>
-                          {patrol.code} ·{' '}
-                          {patrol.name || 'Base'}
+                          {patrol.code} · {patrol.name || 'Base'}
                         </b>
 
                         <br />
 
-                        {patrol.address ||
-                          patrol.zone?.name ||
-                          'Sin dirección'}
+                        {patrol.address || patrol.zone?.name || 'Sin dirección'}
                       </Popup>
                     </Marker>
                   ))}
-
 
                 {/* =============================================
                     ACERCAR A BASE SELECCIONADA
                     ============================================= */}
 
-                {selected ? (
-                  <FlyTo
-                    position={center}
-                    zoom={14}
-                  />
-                ) : null}
-
+                {selected ? <FlyTo position={center} zoom={14} /> : null}
               </MapContainer>
-
 
               {/* ===============================================
                   LEYENDA
@@ -466,7 +375,6 @@ export default function PatrolsPage() {
 
               {visibleZones.length > 0 ? (
                 <div className="patrol-zone-legend">
-
                   <strong>Jurisdicciones</strong>
 
                   {visibleZones.map((zone) => (
@@ -474,37 +382,24 @@ export default function PatrolsPage() {
                       type="button"
                       key={zone.id}
                       className={`patrol-zone-legend__item ${
-                        zone.id === selectedZoneId
-                          ? 'active'
-                          : ''
+                        zone.id === selectedZoneId ? 'active' : ''
                       }`}
-                      onClick={() =>
-                        handleZoneClick(zone)
-                      }
+                      onClick={() => handleZoneClick(zone)}
                     >
-
                       <span
                         className="zone-legend-dot"
                         style={{
-                          backgroundColor:
-                            getZoneColor(zone),
+                          backgroundColor: getZoneColor(zone),
                         }}
                       />
 
-                      <span>
-                        {zone.name}
-                      </span>
-
+                      <span>{zone.name}</span>
                     </button>
                   ))}
-
                 </div>
               ) : null}
-
             </div>
-
           </section>
-
 
           {/* ===================================================
               DETALLE DE BASE
@@ -512,36 +407,25 @@ export default function PatrolsPage() {
 
           {selected ? (
             <section className="panel patrol-detail">
-
               <header>
                 <div>
-                  <h2>
-                    {selected.name ||
-                      selected.code}
-                  </h2>
+                  <h2>{selected.name || selected.code}</h2>
 
                   <p>
                     {selected.code}
                     {' · '}
-                    {selected.zone?.name ||
-                      'Sin zona'}
+                    {selected.zone?.name || 'Sin zona'}
                   </p>
                 </div>
 
-                <StatusBadge
-                  value={selected.status}
-                />
+                <StatusBadge value={selected.status} />
               </header>
 
-
               <div className="detail-grid detail-grid--patrol">
-
                 <div>
                   <span>Dirección</span>
 
-                  <b>
-                    {selected.address || '—'}
-                  </b>
+                  <b>{selected.address || '—'}</b>
                 </div>
 
                 <div>
@@ -565,79 +449,57 @@ export default function PatrolsPage() {
                 </div>
 
                 <div>
-                  <span>
-                    Servicios históricos
-                  </span>
+                  <span>Servicios históricos</span>
 
-                  <b>
-                    {selected._count?.services ||
-                      0}
-                  </b>
+                  <b>{selected._count?.services || 0}</b>
                 </div>
-
               </div>
 
+              <h3 className="subheading">Guardias asignados</h3>
 
-              <h3 className="subheading">
-                Guardias asignados
-              </h3>
-
-
+              {current.isError && (
+                <p role="alert">
+                  No se pudo consultar el estado GPS de los guardias.
+                </p>
+              )}
+              {(current.data || [])
+                .filter(
+                  (item) =>
+                    item.patrol?.id === selectedId ||
+                    selected?.members?.some((m) => m.guardId === item.guard.id),
+                )
+                .map((item) => (
+                  <div key={item.serviceId}>
+                    <b>
+                      {item.guard.firstName} {item.guard.lastName}
+                    </b>
+                    <ComplianceStatus onlyZone compliance={item.compliance} />
+                  </div>
+                ))}
               <div className="assigned-guards">
-
                 {selected.members?.length ? (
+                  selected.members.map((member) => (
+                    <div key={member.guardId}>
+                      <UserAvatar
+                        src={member.guard?.user?.photoUrl}
+                        name={member.guard?.firstName}
+                        size={34}
+                      />
 
-                  selected.members.map(
-                    (member) => (
-                      <div key={member.guardId}>
-
-                        <UserAvatar
-                          src={
-                            member.guard?.user
-                              ?.photoUrl
-                          }
-                          name={
-                            member.guard
-                              ?.firstName
-                          }
-                          size={34}
-                        />
-
-                        <span>
-                          <b>
-                            {member.guard?.code}
-                          </b>{' '}
-
-                          {
-                            member.guard
-                              ?.firstName
-                          }{' '}
-
-                          {
-                            member.guard
-                              ?.lastName
-                          }
-                        </span>
-
-                      </div>
-                    )
-                  )
-
+                      <span>
+                        <b>{member.guard?.code}</b> {member.guard?.firstName}{' '}
+                        {member.guard?.lastName}
+                      </span>
+                    </div>
+                  ))
                 ) : (
-                  <span>
-                    Sin guardias asignados
-                  </span>
+                  <span>Sin guardias asignados</span>
                 )}
-
               </div>
-
             </section>
           ) : null}
-
         </div>
-
       </section>
-
 
       {/* =======================================================
           MODAL CREAR / EDITAR
@@ -654,7 +516,6 @@ export default function PatrolsPage() {
         onClose={() => setModal(null)}
         wide
       >
-
         <PatrolForm
           initial={modal?.patrol}
           guards={guards.data?.items || []}
@@ -668,9 +529,7 @@ export default function PatrolsPage() {
             })
           }
         />
-
       </Modal>
-
     </div>
   );
 }

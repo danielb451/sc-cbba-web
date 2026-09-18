@@ -3,10 +3,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-ARG VITE_API_URL=https://sc-cbb-web.up.railway.app/api
-ARG VITE_SOCKET_URL=https://sc-cbb-web.up.railway.app
+ARG VITE_API_BASE_URL=sc-cbb-web.up.railway.app/api
+ARG VITE_SOCKET_URL=sc-cbb-web.up.railway.app
 ARG VITE_MAP_TILE_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
 ENV VITE_MAP_TILE_URL=$VITE_MAP_TILE_URL
 RUN npm run build

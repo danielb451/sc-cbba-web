@@ -6,7 +6,7 @@ let socket = null;
 export function connectSocket() {
   if (socket?.connected) return socket;
   if (socket) socket.disconnect();
-  socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000', {
+  socket = io(import.meta.env.VITE_SOCKET_URL || 'sc-cbb-web.up.railway.app', {
     transports: ['websocket', 'polling'],
     auth: { token: tokenStorage.getAccess() },
     autoConnect: true,

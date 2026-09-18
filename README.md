@@ -25,8 +25,8 @@ npm run dev
 Variables:
 
 ```text
-VITE_API_URL=http://localhost:4000/api
-VITE_SOCKET_URL=http://localhost:4000
+VITE_API_URL=sc-cbb-web.up.railway.app/api
+VITE_SOCKET_URL=sc-cbb-web.up.railway.app
 VITE_MAP_TILE_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
 VITE_MAP_ATTRIBUTION=&copy; OpenStreetMap contributors
 ```

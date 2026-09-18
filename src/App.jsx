@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import AssignedRoutesPage from './pages/AssignedRoutesPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import LiveMapPage from './pages/LiveMapPage.jsx';
@@ -23,15 +24,35 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route element={<PermissionRoute permission="dashboard.read" />}><Route index element={<DashboardPage />} /></Route>
-          <Route element={<PermissionRoute permission="map.read" />}><Route path="mapa" element={<LiveMapPage />} /></Route>
-          <Route element={<PermissionRoute permission="guards.read" />}><Route path="guardias" element={<GuardsPage />} /><Route path="guardias/:id" element={<GuardDetailPage />} /></Route>
-          <Route element={<PermissionRoute permission="services.read" />}><Route path="servicios" element={<ServicesPage />} /><Route path="servicios/:guardId" element={<GuardServicesPage />} /></Route>
-          <Route path="hechos" element={<IncidentsPage />} /><Route path="hechos/:id" element={<IncidentDetailPage />} />
+          <Route element={<PermissionRoute permission="dashboard.read" />}>
+            <Route index element={<DashboardPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="map.read" />}>
+            <Route path="mapa" element={<LiveMapPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="guards.read" />}>
+            <Route path="guardias" element={<GuardsPage />} />
+            <Route path="guardias/:id" element={<GuardDetailPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="services.read" />}>
+            <Route path="servicios" element={<ServicesPage />} />
+            <Route path="servicios/:guardId" element={<GuardServicesPage />} />
+          </Route>
+          <Route path="hechos" element={<IncidentsPage />} />
+          <Route path="hechos/:id" element={<IncidentDetailPage />} />
+          <Route element={<PermissionRoute permission="patrols.manage" />}>
+            <Route path="rutas-asignadas" element={<AssignedRoutesPage />} />
+          </Route>
           <Route path="patrullas" element={<PatrolsPage />} />
-          <Route element={<PermissionRoute permission="reports.read" />}><Route path="reportes" element={<ReportsPage />} /></Route>
-          <Route element={<PermissionRoute permission="settings.manage" />}><Route path="configuracion" element={<SettingsPage />} /></Route>
-          <Route element={<PermissionRoute permission="users.manage" />}><Route path="usuarios" element={<UsersPage />} /></Route>
+          <Route element={<PermissionRoute permission="reports.read" />}>
+            <Route path="reportes" element={<ReportsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="settings.manage" />}>
+            <Route path="configuracion" element={<SettingsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="users.manage" />}>
+            <Route path="usuarios" element={<UsersPage />} />
+          </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

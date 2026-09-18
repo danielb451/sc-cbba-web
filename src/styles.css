@@ -785,3 +785,5 @@ code { background: #f1effa; padding: 2px 5px; border-radius: 6px; font-size: .86
     0 0 0 2px rgba(255,255,255,.8),
     0 1px 4px rgba(0,0,0,.12);
 }
+/* Assigned routes and interactive jurisdictions */
+.geometry-editor{width:100%;min-width:0}.geometry-editor p{font-size:14px;line-height:1.5;color:#64748b}.geometry-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}.geometry-point{border:2px solid white;border-radius:50%;background:#7c3aed;color:white;text-align:center;line-height:22px;font-weight:700;box-shadow:0 2px 8px #0005}.geometry-fit{position:absolute;right:10px;top:10px;z-index:800;border:0;background:white;padding:9px;border-radius:6px;cursor:pointer}.compliance-status{display:grid;gap:6px;margin:12px 0;font-size:13px;line-height:1.5}.compliance-status>div{padding:10px 12px;border-radius:8px}.compliance-alert{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}.compliance-ok{background:#ecfdf5;color:#065f46}.compliance-unknown{background:#fffbeb;color:#92400e}.geometry-editor .leaflet-container{border-radius:12px}.setting-card input{width:100%}
