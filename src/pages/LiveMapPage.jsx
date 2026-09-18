@@ -57,6 +57,20 @@ export default function LiveMapPage() {
     ),
   });
 
+  const zones = useQuery({
+    queryKey: ['zones'],
+    queryFn: catalogApi.zones,
+    staleTime: 30_000,
+  });
+
+  const visibleZones = useMemo(
+    () =>
+      (zones.data || []).filter(
+        (zone) => zone.active !== false && Boolean(zone.geoJson),
+      ),
+    [zones.data],
+  );
+
   const incidentFrom = hotspotHours;
   const incidents = useQuery({
     queryKey: ['incidents', 'map-live', incidentFrom],
@@ -201,6 +215,12 @@ export default function LiveMapPage() {
           servidor.
         </p>
       )}
+      {zones.isError && (
+        <p role="alert">
+          No se pudieron cargar las zonas configuradas. Revisa la conexión con
+          el servidor.
+        </p>
+      )}
       <section className="live-map-toolbar">
         <div className="map-filter-chip map-filter-chip--active">
           <Radio size={17} /> Operación en tiempo real
@@ -243,15 +263,13 @@ export default function LiveMapPage() {
                   '&copy; OpenStreetMap contributors'
                 }
               />
-              {(current.data || []).map((item) =>
-                item.zone ? (
-                  <JurisdictionLayer
-                    key={`zone-${item.serviceId}`}
-                    zone={item.zone}
-                    selected={item.serviceId === selectedId}
-                  />
-                ) : null,
-              )}
+              {visibleZones.map((zone) => (
+                <JurisdictionLayer
+                  key={`zone-${zone.id}`}
+                  zone={zone}
+                  selected={zone.id === (selected?.zoneId || selected?.zone?.id)}
+                />
+              ))}
               {(incidents.data || []).map((incident) => (
                 <IncidentHotspot
                   key={incident.id}
