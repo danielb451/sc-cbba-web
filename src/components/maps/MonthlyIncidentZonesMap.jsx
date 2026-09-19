@@ -48,32 +48,85 @@ function HeatOverlay({ points }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!map || !points.length) return undefined;
+    if (!map || !points.length) {
+      return undefined;
+    }
 
-    const heatPoints = points.map((point) => [
-      point.latitude,
-      point.longitude,
-      point.weight,
-    ]);
+    let heatLayer = null;
 
-    const heat = L.heatLayer(heatPoints, {
-      radius: 28,
-      blur: 22,
-      maxZoom: 17,
-      minOpacity: 0.28,
-      gradient: {
-        0.15: '#ffb3b3',
-        0.35: '#ff7a7a',
-        0.55: '#ff4d4d',
-        0.75: '#e11d48',
-        0.95: '#991b1b',
-      },
-    });
+    const drawHeat = () => {
+      if (heatLayer) {
+        map.removeLayer(heatLayer);
+      }
 
-    heat.addTo(map);
+      const zoom = map.getZoom();
+
+      /*
+       * Mientras más zoom,
+       * mayor radio visual.
+       *
+       * Esto evita que el heatmap
+       * se vea diminuto al acercarse.
+       */
+      const radius = Math.min(
+        70,
+        Math.max(
+          32,
+          32 + (zoom - 13) * 8,
+        ),
+      );
+
+      const blur = Math.min(
+        55,
+        Math.max(
+          24,
+          24 + (zoom - 13) * 6,
+        ),
+      );
+
+      const heatPoints = points.map(
+        (point) => [
+          point.latitude,
+          point.longitude,
+          point.weight,
+        ],
+      );
+
+      heatLayer = L.heatLayer(
+        heatPoints,
+        {
+          radius,
+          blur,
+
+          maxZoom: 19,
+
+          minOpacity: 0.34,
+
+          gradient: {
+            0.10: '#ffd6d6',
+            0.25: '#ff9b9b',
+            0.40: '#ff6666',
+            0.55: '#ff3333',
+            0.70: '#ef1b1b',
+            0.85: '#c8102e',
+            1.00: '#7f0015',
+          },
+        },
+      );
+
+      heatLayer.addTo(map);
+    };
+
+    drawHeat();
+
+    map.on('zoomend', drawHeat);
 
     return () => {
-      map.removeLayer(heat);
+      map.off('zoomend', drawHeat);
+
+      if (heatLayer) {
+        map.removeLayer(heatLayer);
+      }
     };
   }, [map, points]);
 
