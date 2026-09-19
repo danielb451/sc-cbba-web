@@ -7,43 +7,17 @@ import {
   useMap,
 } from 'react-leaflet';
 import { useQuery } from '@tanstack/react-query';
+import L from 'leaflet';
+import 'leaflet.heat';
 
 import { reportApi } from '../../api/endpoints.js';
 import { COCHABAMBA_CENTER } from '../../lib/maps.js';
 
-/*
- * Distancia máxima para considerar varios hechos
- * como ocurridos en el mismo sector.
- *
- * 30 metros funciona bien para representar un mismo
- * lugar sin mezclar hechos demasiado alejados.
- */
-const HOTSPOT_RADIUS_METERS = 30;
-
 function monthRange(month) {
-  const [year, monthNumber] = month
-    .split('-')
-    .map(Number);
+  const [year, monthNumber] = month.split('-').map(Number);
 
-  const start = new Date(
-    year,
-    monthNumber - 1,
-    1,
-    0,
-    0,
-    0,
-    0,
-  );
-
-  const end = new Date(
-    year,
-    monthNumber,
-    0,
-    23,
-    59,
-    59,
-    999,
-  );
+  const start = new Date(year, monthNumber - 1, 1, 0, 0, 0, 0);
+  const end = new Date(year, monthNumber, 0, 23, 59, 59, 999);
 
   return {
     from: start.toISOString(),
@@ -51,247 +25,66 @@ function monthRange(month) {
   };
 }
 
-function distanceMeters(
-  lat1,
-  lng1,
-  lat2,
-  lng2,
-) {
-  const earthRadius = 6371000;
-
-  const toRadians = (value) =>
-    (value * Math.PI) / 180;
-
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
-
-  const a =
-    Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a),
-    );
-
-  return earthRadius * c;
-}
-
-function buildHotspots(incidents) {
-  const validIncidents = incidents
-    .map((incident) => ({
-      ...incident,
-      __lat: Number(incident.latitude),
-      __lng: Number(incident.longitude),
-    }))
-    .filter(
-      (incident) =>
-        Number.isFinite(incident.__lat) &&
-        Number.isFinite(incident.__lng),
-    );
-
-  const clusters = [];
-
-  for (const incident of validIncidents) {
-    let nearestCluster = null;
-    let nearestDistance = Infinity;
-
-    for (const cluster of clusters) {
-      const distance = distanceMeters(
-        incident.__lat,
-        incident.__lng,
-        cluster.latitude,
-        cluster.longitude,
-      );
-
-      if (
-        distance <= HOTSPOT_RADIUS_METERS &&
-        distance < nearestDistance
-      ) {
-        nearestCluster = cluster;
-        nearestDistance = distance;
-      }
-    }
-
-    if (!nearestCluster) {
-      clusters.push({
-        latitude: incident.__lat,
-        longitude: incident.__lng,
-        sumLatitude: incident.__lat,
-        sumLongitude: incident.__lng,
-        incidents: [incident],
-      });
-
-      continue;
-    }
-
-    nearestCluster.incidents.push(incident);
-
-    nearestCluster.sumLatitude +=
-      incident.__lat;
-
-    nearestCluster.sumLongitude +=
-      incident.__lng;
-
-    nearestCluster.latitude =
-      nearestCluster.sumLatitude /
-      nearestCluster.incidents.length;
-
-    nearestCluster.longitude =
-      nearestCluster.sumLongitude /
-      nearestCluster.incidents.length;
-  }
-
-  return clusters
-    .map((cluster) => ({
-      ...cluster,
-      count: cluster.incidents.length,
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-function hotspotStyle(count, maxCount) {
-  const intensity =
-    maxCount <= 1
-      ? 0
-      : (count - 1) /
-        (maxCount - 1);
-
-  /*
-   * 1 hecho:
-   * rojo claro y pequeño.
-   *
-   * Muchos hechos:
-   * rojo oscuro, opaco y más grande.
-   */
-  const lightness =
-    62 - intensity * 32;
-
-  const color =
-    `hsl(0, 84%, ${lightness}%)`;
-
-  return {
-    radius:
-      8 +
-      intensity * 15 +
-      Math.min(count - 1, 5),
-
-    color,
-    fillColor: color,
-
-    fillOpacity:
-      0.42 +
-      intensity * 0.46,
-
-    opacity:
-      0.75 +
-      intensity * 0.25,
-
-    weight:
-      1.5 +
-      intensity * 1.5,
-  };
-}
-
-function FitHotspots({ hotspots }) {
+function FitIncidents({ points }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!hotspots.length) return;
+    if (!points.length) return;
 
-    const positions = hotspots.map(
-      (hotspot) => [
-        hotspot.latitude,
-        hotspot.longitude,
-      ],
-    );
+    const bounds = L.latLngBounds(points.map((point) => [point.latitude, point.longitude]));
 
-    if (positions.length === 1) {
-      map.setView(
-        positions[0],
-        16,
-      );
-
-      return;
-    }
-
-    map.fitBounds(
-      positions,
-      {
-        padding: [45, 45],
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [40, 40],
         maxZoom: 16,
-      },
-    );
-  }, [map, hotspots]);
+      });
+    }
+  }, [map, points]);
 
   return null;
 }
 
-function HotspotTooltip({ hotspot }) {
-  const types = {};
+function HeatOverlay({ points }) {
+  const map = useMap();
 
-  hotspot.incidents.forEach(
-    (incident) => {
-      const name =
-        incident.incidentType?.name ||
-        'Otro';
+  useEffect(() => {
+    if (!map || !points.length) return undefined;
 
-      types[name] =
-        (types[name] || 0) + 1;
-    },
-  );
+    const heatPoints = points.map((point) => [
+      point.latitude,
+      point.longitude,
+      point.weight,
+    ]);
 
-  return (
-    <div
-      style={{
-        minWidth: 150,
-      }}
-    >
-      <strong>
-        {hotspot.count}{' '}
-        {hotspot.count === 1
-          ? 'hecho registrado'
-          : 'hechos registrados'}
-      </strong>
+    const heat = L.heatLayer(heatPoints, {
+      radius: 28,
+      blur: 22,
+      maxZoom: 17,
+      minOpacity: 0.28,
+      gradient: {
+        0.15: '#ffb3b3',
+        0.35: '#ff7a7a',
+        0.55: '#ff4d4d',
+        0.75: '#e11d48',
+        0.95: '#991b1b',
+      },
+    });
 
-      <div
-        style={{
-          marginTop: 6,
-        }}
-      >
-        {Object.entries(types)
-          .slice(0, 5)
-          .map(([name, count]) => (
-            <div key={name}>
-              {name}: <b>{count}</b>
-            </div>
-          ))}
-      </div>
-    </div>
-  );
+    heat.addTo(map);
+
+    return () => {
+      map.removeLayer(heat);
+    };
+  }, [map, points]);
+
+  return null;
 }
 
-export default function MonthlyIncidentZonesMap({
-  month,
-}) {
-  const range = useMemo(
-    () => monthRange(month),
-    [month],
-  );
+export default function MonthlyIncidentZonesMap({ month }) {
+  const range = useMemo(() => monthRange(month), [month]);
 
   const incidents = useQuery({
-    queryKey: [
-      'reports',
-      'incident-hotspots',
-      month,
-    ],
-
+    queryKey: ['reports', 'incident-heatmap', month],
     queryFn: () =>
       reportApi.incidents({
         from: range.from,
@@ -307,28 +100,42 @@ export default function MonthlyIncidentZonesMap({
     return incidents.data?.items || [];
   }, [incidents.data]);
 
-  const hotspots = useMemo(
-    () => buildHotspots(rows),
-    [rows],
-  );
+  const points = useMemo(() => {
+    const valid = rows
+      .map((incident) => ({
+        ...incident,
+        latitude: Number(incident.latitude),
+        longitude: Number(incident.longitude),
+      }))
+      .filter(
+        (incident) =>
+          Number.isFinite(incident.latitude) &&
+          Number.isFinite(incident.longitude),
+      );
 
-  const maxCount = Math.max(
-    1,
-    ...hotspots.map(
-      (hotspot) => hotspot.count,
-    ),
-  );
+    const frequency = new Map();
+
+    valid.forEach((incident) => {
+      const key = `${incident.latitude.toFixed(5)},${incident.longitude.toFixed(5)}`;
+      frequency.set(key, (frequency.get(key) || 0) + 1);
+    });
+
+    return valid.map((incident) => {
+      const key = `${incident.latitude.toFixed(5)},${incident.longitude.toFixed(5)}`;
+      const count = frequency.get(key) || 1;
+
+      return {
+        ...incident,
+        weight: Math.min(1, 0.22 + count * 0.18),
+        repeatedCount: count,
+      };
+    });
+  }, [rows]);
 
   if (incidents.isLoading) {
     return (
       <section className="panel">
-        <div
-          style={{
-            padding: 24,
-          }}
-        >
-          Cargando mapa de hechos...
-        </div>
+        <div style={{ padding: 24 }}>Cargando mapa de calor...</div>
       </section>
     );
   }
@@ -336,14 +143,7 @@ export default function MonthlyIncidentZonesMap({
   if (incidents.isError) {
     return (
       <section className="panel">
-        <div
-          style={{
-            padding: 24,
-          }}
-        >
-          No se pudo cargar el mapa de
-          hechos.
-        </div>
+        <div style={{ padding: 24 }}>No se pudo cargar el mapa de calor.</div>
       </section>
     );
   }
@@ -351,72 +151,35 @@ export default function MonthlyIncidentZonesMap({
   return (
     <section
       className="panel"
-      style={{
-        overflow: 'hidden',
-      }}
+      style={{ overflow: 'hidden' }}
     >
       <header
         style={{
           padding: '18px 20px',
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          justifyContent:
-            'space-between',
           gap: 20,
         }}
       >
         <div>
-          <h3
-            style={{
-              margin: 0,
-            }}
-          >
-            Concentración de hechos
-          </h3>
-
-          <p
-            style={{
-              margin: '5px 0 0',
-              color: '#64748b',
-            }}
-          >
-            Ubicaciones donde los
-            guardias registraron hechos
-            durante el mes.
+          <h3 style={{ margin: 0 }}>Mapa de calor de hechos</h3>
+          <p style={{ margin: '5px 0 0', color: '#64748b' }}>
+            Zonas con mayor concentración de reportes del mes.
           </p>
         </div>
 
-        <div
-          style={{
-            textAlign: 'right',
-          }}
-        >
-          <strong
-            style={{
-              display: 'block',
-              fontSize: 20,
-            }}
-          >
+        <div style={{ textAlign: 'right' }}>
+          <strong style={{ display: 'block', fontSize: 20 }}>
             {rows.length}
           </strong>
-
-          <span
-            style={{
-              fontSize: 12,
-              color: '#64748b',
-            }}
-          >
-            hechos registrados
+          <span style={{ fontSize: 12, color: '#64748b' }}>
+            reportes
           </span>
         </div>
       </header>
 
-      <div
-        style={{
-          height: 590,
-          position: 'relative',
-        }}
-      >
+      <div style={{ height: 590, position: 'relative' }}>
         <MapContainer
           center={COCHABAMBA_CENTER}
           zoom={13}
@@ -424,67 +187,53 @@ export default function MonthlyIncidentZonesMap({
         >
           <TileLayer
             url={
-              import.meta.env
-                .VITE_MAP_TILE_URL ||
+              import.meta.env.VITE_MAP_TILE_URL ||
               'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             }
             attribution={
-              import.meta.env
-                .VITE_MAP_ATTRIBUTION ||
+              import.meta.env.VITE_MAP_ATTRIBUTION ||
               '&copy; OpenStreetMap contributors'
             }
           />
 
-          <FitHotspots
-            hotspots={hotspots}
-          />
+          <FitIncidents points={points} />
+          <HeatOverlay points={points} />
 
-          {hotspots.map(
-            (hotspot, index) => {
-              const style =
-                hotspotStyle(
-                  hotspot.count,
-                  maxCount,
-                );
-
-              return (
-                <CircleMarker
-                  key={`${hotspot.latitude}-${hotspot.longitude}-${index}`}
-                  center={[
-                    hotspot.latitude,
-                    hotspot.longitude,
-                  ]}
-                  radius={style.radius}
-                  pathOptions={{
-                    color:
-                      style.color,
-                    fillColor:
-                      style.fillColor,
-                    fillOpacity:
-                      style.fillOpacity,
-                    opacity:
-                      style.opacity,
-                    weight:
-                      style.weight,
-                  }}
-                >
-                  <Tooltip
-                    direction="top"
-                    offset={[0, -5]}
-                  >
-                    <HotspotTooltip
-                      hotspot={
-                        hotspot
-                      }
-                    />
-                  </Tooltip>
-                </CircleMarker>
-              );
-            },
-          )}
+          {points.map((incident) => (
+            <CircleMarker
+              key={incident.id}
+              center={[incident.latitude, incident.longitude]}
+              radius={4}
+              pathOptions={{
+                color: '#991b1b',
+                fillColor: '#dc2626',
+                fillOpacity: 0.55,
+                opacity: 0.7,
+                weight: 1,
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -3]}>
+                <div style={{ minWidth: 170 }}>
+                  <strong>{incident.code || 'Hecho'}</strong>
+                  <br />
+                  {incident.incidentType?.name || 'Sin tipo'}
+                  <br />
+                  Prioridad: <b>{incident.priority || '—'}</b>
+                  <br />
+                  Estado: <b>{incident.status || '—'}</b>
+                  {incident.repeatedCount > 1 ? (
+                    <>
+                      <br />
+                      <span>
+                        Punto repetido: <b>{incident.repeatedCount}</b>
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          ))}
         </MapContainer>
-
-        {/* LEYENDA */}
 
         <div
           style={{
@@ -494,10 +243,8 @@ export default function MonthlyIncidentZonesMap({
             bottom: 16,
             padding: '12px 14px',
             borderRadius: 14,
-            background:
-              'rgba(255,255,255,.95)',
-            boxShadow:
-              '0 8px 24px rgba(0,0,0,.12)',
+            background: 'rgba(255,255,255,.95)',
+            boxShadow: '0 8px 24px rgba(0,0,0,.12)',
           }}
         >
           <strong
@@ -507,14 +254,14 @@ export default function MonthlyIncidentZonesMap({
               fontSize: 12,
             }}
           >
-            Concentración
+            Intensidad
           </strong>
 
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 7,
+              gap: 8,
             }}
           >
             <span
@@ -522,91 +269,30 @@ export default function MonthlyIncidentZonesMap({
                 width: 12,
                 height: 12,
                 borderRadius: '50%',
-                background:
-                  'hsl(0, 84%, 62%)',
+                background: '#ffb3b3',
               }}
             />
-
-            <span
-              style={{
-                fontSize: 11,
-              }}
-            >
-              Menor
-            </span>
+            <span style={{ fontSize: 11 }}>Baja</span>
 
             <span
               style={{
                 width: 16,
                 height: 16,
                 borderRadius: '50%',
-                background:
-                  'hsl(0, 84%, 46%)',
+                background: '#ff4d4d',
               }}
             />
-
             <span
               style={{
                 width: 20,
                 height: 20,
                 borderRadius: '50%',
-                background:
-                  'hsl(0, 84%, 30%)',
+                background: '#991b1b',
               }}
             />
-
-            <span
-              style={{
-                fontSize: 11,
-              }}
-            >
-              Mayor
-            </span>
+            <span style={{ fontSize: 11 }}>Alta</span>
           </div>
         </div>
-
-        {/* RESUMEN */}
-
-        {hotspots.length > 0 ? (
-          <div
-            style={{
-              position: 'absolute',
-              zIndex: 500,
-              right: 16,
-              bottom: 16,
-              width: 205,
-              padding: 14,
-              borderRadius: 14,
-              background:
-                'rgba(255,255,255,.95)',
-              boxShadow:
-                '0 8px 24px rgba(0,0,0,.12)',
-            }}
-          >
-            <strong
-              style={{
-                fontSize: 12,
-              }}
-            >
-              Punto con mayor
-              concentración
-            </strong>
-
-            <div
-              style={{
-                marginTop: 7,
-                fontSize: 13,
-              }}
-            >
-              <b>
-                {hotspots[0].count}
-              </b>{' '}
-              {hotspots[0].count === 1
-                ? 'hecho'
-                : 'hechos'}
-            </div>
-          </div>
-        ) : null}
       </div>
     </section>
   );
