@@ -257,10 +257,16 @@ export default function SettingsPage() {
       <ZoneModal
         open={Boolean(zoneModal)}
         initial={zoneModal?.zone}
+        zones={zones.data || []}
         loading={saveZone.isPending}
-        onClose={() => setZoneModal(null)}
+        onClose={() =>
+          setZoneModal(null)
+        }
         onSave={(payload) =>
-          saveZone.mutate({ initial: zoneModal?.zone, payload })
+          saveZone.mutate({
+            initial: zoneModal?.zone,
+            payload,
+          })
         }
       />
       <TypeModal
@@ -276,7 +282,7 @@ export default function SettingsPage() {
   );
 }
 
-function ZoneModal({ open, initial, onClose, onSave, loading }) {
+function ZoneModal({open,initial,zones = [],onClose,onSave,loading,}) {
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -295,6 +301,17 @@ function ZoneModal({ open, initial, onClose, onSave, loading }) {
         : { name: '', description: '', active: true, geoJson: null },
     );
   }, [initial, open]);
+
+  const referenceZones =
+    useMemo(() => {
+      return zones.filter(
+        (zone) =>
+          zone.id !== initial?.id &&
+          zone.active !== false &&
+          Boolean(zone.geoJson),
+      );
+    }, [zones, initial?.id]);
+
   const submit = (e) => {
     e.preventDefault();
     onSave({
@@ -342,7 +359,13 @@ function ZoneModal({ open, initial, onClose, onSave, loading }) {
           <GeometryEditor
             key={`${open}-${initial?.id || 'new'}`}
             value={form.geoJson}
-            onChange={(geoJson) => setForm({ ...form, geoJson })}
+            referenceZones={referenceZones}
+            onChange={(geoJson) =>
+              setForm({
+                ...form,
+                geoJson,
+              })
+            }
           />
         </div>
         <div className="form-actions form-field--full">

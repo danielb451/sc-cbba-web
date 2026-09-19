@@ -10,6 +10,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { COCHABAMBA_CENTER } from '../../lib/maps.js';
+import JurisdictionLayer from './JurisdictionLayer.jsx';
 
 function paths(value, path = []) {
   if (!value) return [];
@@ -60,7 +61,92 @@ function Fit({ points }) {
     </button>
   );
 }
-export default function GeometryEditor({ value, onChange, mode = 'Polygon' }) {
+
+function normalizeGeoJson(value) {
+  if (!value) return null;
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function FitReferenceZones({
+  zones,
+  enabled,
+}) {
+  const map = useMap();
+  const fitted = useRef(false);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      fitted.current ||
+      !zones.length
+    ) {
+      return;
+    }
+
+    const bounds =
+      L.latLngBounds([]);
+
+    zones.forEach((zone) => {
+      const geometry =
+        normalizeGeoJson(
+          zone.geoJson,
+        );
+
+      if (!geometry) return;
+
+      try {
+        const layer =
+          L.geoJSON(geometry);
+
+        const zoneBounds =
+          layer.getBounds();
+
+        if (
+          zoneBounds.isValid()
+        ) {
+          bounds.extend(
+            zoneBounds,
+          );
+        }
+      } catch {
+        // Ignora GeoJSON inválido.
+      }
+    });
+
+    if (bounds.isValid()) {
+      fitted.current = true;
+
+      map.fitBounds(
+        bounds,
+        {
+          padding: [30, 30],
+          maxZoom: 15,
+        },
+      );
+    }
+  }, [
+    map,
+    zones,
+    enabled,
+  ]);
+
+  return null;
+}
+
+export default function GeometryEditor({value,onChange,mode = 'Polygon',referenceZones = [],}) {
   const [ring, setRing] = useState(0),
     [history, setHistory] = useState([]),
     [selected, setSelected] = useState(null);
@@ -126,6 +212,21 @@ export default function GeometryEditor({ value, onChange, mode = 'Polygon' }) {
             'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
           }
           attribution="&copy; OpenStreetMap contributors"
+        />
+        {/* ZONAS YA EXISTENTES */}
+        {referenceZones.map(
+          (zone) => (
+            <JurisdictionLayer
+              key={`reference-zone-${zone.id}`}
+              zone={zone}
+              interactive={false}
+            />
+          ),
+        )}
+
+        <FitReferenceZones
+          zones={referenceZones}
+          enabled={!points.length}
         />
         <Clicks onPoint={(p) => change([...points, p])} />
         {all.map((part, i) =>
