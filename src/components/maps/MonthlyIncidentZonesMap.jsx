@@ -260,9 +260,9 @@ export default function MonthlyIncidentZonesMap({ month }) {
               pathOptions={{
                 color: '#991b1b',
                 fillColor: '#dc2626',
-                fillOpacity: 0.55,
-                opacity: 0.7,
-                weight: 1,
+                fillOpacity: 1.55,
+                opacity: 1.7,
+                weight: 2,
               }}
             >
               <Tooltip direction="top" offset={[0, -3]}>
